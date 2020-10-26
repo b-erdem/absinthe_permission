@@ -1,4 +1,6 @@
 defmodule Absinthe.Permission.PolicyCheck do
+  alias Absinthe.Permission.DefaultFetcher
+
   @spec has_permission?(atom | binary, any) :: boolean
   def has_permission?(nil, _), do: true
 
@@ -116,11 +118,11 @@ defmodule Absinthe.Permission.PolicyCheck do
     {preload, context____} = Keyword.pop(context___, :preload)
 
     {:ok, result} =
-      FetchModel.run(
+      DefaultFetcher.fetch(
         model: model,
         preload: preload,
         clause: {remote_key, input_val},
-        tenant: user_context.tenant
+        extras: user_context.tenant
       )
 
     res = checker(result, context____, args, user_context)
