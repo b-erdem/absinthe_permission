@@ -1,11 +1,11 @@
-defmodule Absinthe.Permission do
+defmodule Absinthe.Middleware.Permission do
   @moduledoc """
 
   """
 
   @behaviour Absinthe.Middleware
 
-  alias Absinthe.Permission.PolicyCheck
+  alias Absinthe.Permission.PolicyChecker
 
   # check permission
   def call(
@@ -28,13 +28,13 @@ defmodule Absinthe.Permission do
 
     perm = Map.get(meta, :required_permission)
 
-    case PolicyCheck.has_permission?(perm, user_perms) do
+    case PolicyChecker.has_permission?(perm, user_perms) do
       false ->
         res |> Absinthe.Resolution.put_result({:error, "Unauthorized"})
 
       true ->
-        conditions = Map.get(meta, :policies, [])
-        result = PolicyCheck.should_we_allow?(Map.to_list(arguments), conditions, context)
+        conditions = Map.get(meta, :pre_op_policies, [])
+        result = PolicyChecker.should_we_allow?(Map.to_list(arguments), conditions, context)
 
         case result do
           false ->
@@ -57,7 +57,7 @@ defmodule Absinthe.Permission do
       ) do
     meta = Absinthe.Type.meta(res.definition.schema_node)
 
-    access_perms = Map.get(meta, :policies)
+    access_perms = Map.get(meta, :post_op_policies)
 
     case access_perms do
       nil ->
@@ -82,7 +82,7 @@ defmodule Absinthe.Permission do
                 conds
               end)
 
-            val = PolicyCheck.reject(res.value, fs, args, context)
+            val = PolicyChecker.reject(res.value, fs, Map.to_list(args), context)
             %{res | value: val}
         end
     end

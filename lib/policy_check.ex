@@ -1,17 +1,21 @@
-defmodule Absinthe.Permission.PolicyCheck do
+defmodule Absinthe.Permission.PolicyChecker do
   @moduledoc """
 
   """
 
   alias Absinthe.Permission.DefaultFetcher
 
+  @type args :: Keyword.t()
+  @type permission :: atom | binary
   @type condition :: Keyword.t()
   @type clause :: Keyword.t()
+  @type remote_context :: Keyword.t()
 
   @spec has_permission?(atom | binary, list(atom) | list(binary)) :: boolean
   def has_permission?(required_perm, user_perms)
 
   def has_permission?(nil, _), do: true
+  def has_permission?("", _), do: true
 
   def has_permission?(perm, user_perms) when is_atom(perm) do
     Atom.to_string(perm) in user_perms
@@ -21,7 +25,7 @@ defmodule Absinthe.Permission.PolicyCheck do
     perm in user_perms
   end
 
-  @spec should_we_allow?(Keyword.t(), list(), map()) :: boolean()
+  @spec should_we_allow?(args(), list(condition()), map()) :: boolean()
   def should_we_allow?(args, conds, context) do
     perms = allowed?(args, conds, context, [])
 
@@ -36,9 +40,9 @@ defmodule Absinthe.Permission.PolicyCheck do
     end
   end
 
-  @spec reject(list | map, list(atom | binary), list(map()), map()) :: map()
+  @spec reject(list | map, list(atom | binary), args(), map()) :: map()
   def reject(val, filters, args, context) do
-    reject(val, fn x -> checker(x, filters, Map.to_list(args), context) end)
+    reject(val, fn x -> checker(x, filters, args, context) end)
   end
 
   @spec reject(list(), function()) :: list()
@@ -51,7 +55,7 @@ defmodule Absinthe.Permission.PolicyCheck do
     Enum.reject([val], fun) |> List.first()
   end
 
-  @spec higher_permission(list()) :: atom | binary
+  @spec higher_permission(Keyword.t(permission(), integer())) :: permission()
   defp higher_permission(permissions) do
     # TODO: if all conditions have same priority,
     # then instead of choosing first permission
@@ -67,7 +71,7 @@ defmodule Absinthe.Permission.PolicyCheck do
     end
   end
 
-  @spec all_same_priority?(list()) :: boolean()
+  @spec all_same_priority?(Keyword.t(permission(), integer())) :: boolean()
   defp all_same_priority?(permissions) do
     permissions
     |> Enum.map(fn {_k, v} -> v end)
@@ -76,12 +80,8 @@ defmodule Absinthe.Permission.PolicyCheck do
     |> length == 1
   end
 
-  @spec allowed?(Keyword.t(), list(), map(), list(atom | binary)) :: list()
+  @spec allowed?(args(), list(), map(), list(permission())) :: list()
   defp allowed?(args, conds, context, perms)
-
-  # defp allowed?([], _, _context, perms) do
-  #   perms
-  # end
 
   defp allowed?(args, conditions, context, perms) do
     check_conds(conditions, args, context, perms)
@@ -127,7 +127,7 @@ defmodule Absinthe.Permission.PolicyCheck do
     check_clause(condition, condition, args, context, {true, 0})
   end
 
-  @spec check_clause(list(clause), condition(), Keyword.t(), map(), {boolean(), integer()}) ::
+  @spec check_clause(list(clause), condition(), args(), map(), {boolean(), integer()}) ::
           {boolean(), integer()}
   defp check_clause(clauses, condition, args, context, state)
   defp check_clause(_, _, _, _, {false, counter}), do: {false, counter}
@@ -141,25 +141,41 @@ defmodule Absinthe.Permission.PolicyCheck do
          context,
          state
        ) do
-    fetcher =
-      Application.get_env(
-        :absinthe_permission,
-        :fetcher,
-        &DefaultFetcher.fetch/4
-      )
+    # fetcher =
+    #   Application.get_env(
+    #     :absinthe_permission,
+    #     :fetcher,
+    #     &DefaultFetcher.fetch/4
+    #   )
+
+    {config, remote_context} = Keyword.pop(remote_context, :config)
+    {fields, remote_context} = Keyword.pop(remote_context, :fields)
+    {extras, _remote_context} = Keyword.pop(remote_context, :extras)
+
+    {fetcher_key, config} = Keyword.pop(config, :fetcher_key)
+    {remote_key, config} = Keyword.pop(config, :remote_key)
+    {input_key, _config} = Keyword.pop(config, :input_key)
+    input_val = Keyword.get(args, input_key)
+
+    {_fetcher_key, fetcher} =
+      Application.get_env(:absinthe_permission, :fetchers, [])
+      |> Enum.find(fn {fetcher, _module_or_fun} -> fetcher == fetcher_key end)
 
     {:ok, result} =
       case fetcher do
         fun when is_function(fetcher) ->
-          fun.(remote_context, condition, args, context)
+          fun.([key: remote_key, value: input_val, extras: extras], condition, args, context)
 
         {module, fun} ->
-          :erlang.apply(module, fun, [remote_context, condition, args, context])
+          :erlang.apply(module, fun, [
+            %{key: remote_key, value: input_val, extras: extras},
+            condition,
+            args,
+            context
+          ])
       end
 
-    # TODO: remove config keys from remote context.
-    # Otherwise checker will try to check these fields and return false.
-    res = checker(result, remote_context, args, context)
+    res = checker(result, fields, args, context)
 
     check_clause(clauses, condition, args, context, increment(res, state))
   end
@@ -176,28 +192,12 @@ defmodule Absinthe.Permission.PolicyCheck do
     input_val = Keyword.get(args, input_key)
     op = Keyword.get(user_context, :op)
 
-    case op do
-      :eq ->
-        check_clause(
-          clauses,
-          condition,
-          args,
-          context,
-          increment(Map.get(current_user, remote_key) == input_val, state)
-        )
+    new_state =
+      Map.get(current_user, remote_key)
+      |> op_func(op).(input_val)
+      |> increment(state)
 
-      :neq ->
-        check_clause(
-          clauses,
-          condition,
-          args,
-          context,
-          increment(Map.get(current_user, remote_key) != input_val, state)
-        )
-
-      _ ->
-        check_clause(clauses, condition, args, context, increment(false, state))
-    end
+    check_clause(clauses, condition, args, context, new_state)
   end
 
   defp check_clause(
@@ -238,6 +238,13 @@ defmodule Absinthe.Permission.PolicyCheck do
 
   defp checker(result, checks, args, context) do
     checks
+    |> transform_checks()
+    |> fill_checks(args, context)
+    |> Enum.all?(fn {ks, v, op} -> fetch(result, ks) |> op.(v) end)
+  end
+
+  defp transform_checks(checks) do
+    checks
     |> Enum.map(fn
       {k, {v, op}} -> {k, v, op_func(op)}
       {k, v} -> {k, v, op_func(:eq)}
@@ -246,12 +253,15 @@ defmodule Absinthe.Permission.PolicyCheck do
       ks = k |> Atom.to_string() |> String.split("__") |> Enum.map(&String.to_atom/1)
       {ks, v, op}
     end)
+  end
+
+  defp fill_checks(checks, args, context) do
+    checks
     |> Enum.map(fn
       {ks, :current_user_id, op} -> {ks, context.current_user.id, op}
       {ks, v, op} when is_atom(v) -> {ks, Keyword.get(args, v) || v, op}
       {ks, v, op} -> {ks, v, op}
     end)
-    |> Enum.all?(fn {ks, v, op} -> fetch(result, ks) |> op.(v) end)
   end
 
   defp increment(true, {_, counter}), do: {true, counter + 1}
