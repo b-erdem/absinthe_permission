@@ -1,7 +1,12 @@
 defmodule Absinthe.Permission.PolicyCheck do
   alias Absinthe.Permission.DefaultFetcher
 
-  @spec has_permission?(atom | binary, any) :: boolean
+  @type condition :: Keyword.t()
+  @type clause :: Keyword.t()
+
+  @spec has_permission?(atom | binary, list(atom) | list(binary)) :: boolean
+  def has_permission?(required_perm, user_perms)
+
   def has_permission?(nil, _), do: true
 
   def has_permission?(perm, user_perms) when is_atom(perm) do
@@ -12,6 +17,7 @@ defmodule Absinthe.Permission.PolicyCheck do
     perm in user_perms
   end
 
+  @spec should_we_allow?(Keyword.t(), list(), map()) :: boolean()
   def should_we_allow?(args, conds, user_context) do
     perms = allowed?(args, conds, user_context, [])
 
@@ -26,18 +32,22 @@ defmodule Absinthe.Permission.PolicyCheck do
     end
   end
 
+  @spec reject(list | map, list(atom | binary), list(map()), map()) :: map()
   def reject(val, filters, args, user_context) do
     reject(val, fn x -> checker(x, filters, Map.to_list(args), user_context) end)
   end
 
+  @spec reject(list(), function()) :: list()
   def reject(val, fun) when is_list(val) do
     Enum.reject(val, fun)
   end
 
+  @spec reject(map(), function()) :: map()
   def reject(val, fun) do
     Enum.reject([val], fun) |> List.first()
   end
 
+  @spec higher_permission(list()) :: atom | binary
   defp higher_permission(permissions) do
     # TODO: if all conditions have same priority,
     # then instead of choosing first permission
@@ -53,6 +63,7 @@ defmodule Absinthe.Permission.PolicyCheck do
     end
   end
 
+  @spec all_same_priority?(list()) :: boolean()
   defp all_same_priority?(permissions) do
     permissions
     |> Enum.map(fn {_k, v} -> v end)
@@ -61,6 +72,8 @@ defmodule Absinthe.Permission.PolicyCheck do
     |> length == 1
   end
 
+  @spec allowed?(Keyword.t(), list(), map(), list(atom | binary)) :: list()
+  defp allowed?(args, conds, user_context, perms)
   defp allowed?([], _, _user_context, perms) do
     perms
   end
@@ -68,6 +81,9 @@ defmodule Absinthe.Permission.PolicyCheck do
   defp allowed?([{_input_key, _input_val} | _tail] = args, conditions, user_context, perms) do
     check_conds(conditions, args, user_context, perms)
   end
+
+  @spec check_conds(list(condition), Keyword.t(), map(), list()) :: list()
+  defp check_conds(conditions, args, user_context, perms)
 
   defp check_conds([], _args, _user_context, perms) do
     perms
@@ -106,7 +122,8 @@ defmodule Absinthe.Permission.PolicyCheck do
     check_clause(condition, condition, args, user_context, {true, 0})
   end
 
-  defp check_clause(_, _, _, _, {counter, false}), do: {false, counter}
+  @spec check_clause(list(clause), condition(), Keyword.t(), map(), {boolean(), integer()}) :: {boolean(), integer()}
+  defp check_clause(_, _, _, _, {false, counter}), do: {false, counter}
 
   defp check_clause([], _condition, _args, _user_context, state), do: state
 
@@ -127,7 +144,7 @@ defmodule Absinthe.Permission.PolicyCheck do
 
     res = checker(result, context____, args, user_context)
 
-    check_clause(clauses, condition, args, user_context, res |> satisfied?(state))
+    check_clause(clauses, condition, args, user_context, res |> increment(state))
   end
 
   defp check_clause(
@@ -149,7 +166,7 @@ defmodule Absinthe.Permission.PolicyCheck do
           condition,
           args,
           user_context,
-          satisfied?(Map.get(current_user, remote_key) == input_val, state)
+          increment(Map.get(current_user, remote_key) == input_val, state)
         )
 
       :neq ->
@@ -158,11 +175,11 @@ defmodule Absinthe.Permission.PolicyCheck do
           condition,
           args,
           user_context,
-          satisfied?(Map.get(current_user, remote_key) != input_val, state)
+          increment(Map.get(current_user, remote_key) != input_val, state)
         )
 
       _ ->
-        check_clause(clauses, condition, args, user_context, satisfied?(false, state))
+        check_clause(clauses, condition, args, user_context, increment(false, state))
     end
   end
 
@@ -188,7 +205,7 @@ defmodule Absinthe.Permission.PolicyCheck do
       condition,
       args,
       user_context,
-      Keyword.get(args, clause_key) |> op_func(op).(clause_val) |> satisfied?(state)
+      Keyword.get(args, clause_key) |> op_func(op).(clause_val) |> increment(state)
     )
   end
 
@@ -220,12 +237,16 @@ defmodule Absinthe.Permission.PolicyCheck do
     |> Enum.all?(fn {ks, v, op} -> fetch(result, ks) |> op.(v) end)
   end
 
-  defp satisfied?(true, {_, counter}), do: {true, counter + 1}
-  defp satisfied?(false, {_, counter}), do: {false, counter}
+  defp increment(true, {_, counter}), do: {true, counter + 1}
+  defp increment(false, {_, counter}), do: {false, counter}
 
+  @spec op_func(atom()) :: function()
+  defp op_func(op_key)
   defp op_func(:eq), do: &==/2
   defp op_func(:neq), do: &!=/2
 
+  @spec fetch(map(), list(atom | binary)) :: any()
+  defp fetch(container, keys)
   defp fetch(nil, _), do: nil
   defp fetch(container, [h]), do: Map.get(container, h)
 
