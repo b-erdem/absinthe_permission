@@ -1,6 +1,6 @@
 # AbsinthePermission
 
-**Permission Middleware for Absinthe Queries/Mutations/Subscriptions**
+**Fine-grained Permission/Policy Check Middleware for Absinthe Queries/Mutations/Subscriptions**
 
 ## Installation
 
