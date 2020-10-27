@@ -125,10 +125,9 @@ defmodule AbsinthePermissionTest do
     current_user = %{id: 1, name: "Baris", email: "baris@erdem.dev"}
     user_perms = ["can_view_todo_list"]
 
-    {:ok, res} =
+    {:ok, %{errors: [%{message: "Unauthorized"}]}} =
       Absinthe.run(doc, TodoSchema,
-        context: %{auth: %{current_user: current_user, permissions: user_perms}}
+        context: %{current_user: current_user, permissions: user_perms}
       )
-      |> IO.inspect(label: "res")
   end
 end

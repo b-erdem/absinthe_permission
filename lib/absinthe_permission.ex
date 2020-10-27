@@ -12,7 +12,7 @@ defmodule Absinthe.Permission do
         %{
           state: :unresolved,
           arguments: arguments,
-          context: %{auth: %{permissions: user_perms} = auth_context}
+          context: %{current_user: _current_user, permissions: user_perms} = context
         } = res,
         _config
       ) do
@@ -34,7 +34,7 @@ defmodule Absinthe.Permission do
 
       true ->
         conditions = Map.get(meta, :policies, [])
-        result = PolicyCheck.should_we_allow?(Map.to_list(arguments), conditions, auth_context)
+        result = PolicyCheck.should_we_allow?(Map.to_list(arguments), conditions, context)
 
         case result do
           false ->
@@ -51,7 +51,7 @@ defmodule Absinthe.Permission do
         %{
           state: :resolved,
           arguments: args,
-          context: %{auth: %{permissions: user_perms} = user_context}
+          context: %{current_user: _current_user, permissions: user_perms} = context
         } = res,
         _config
       ) do
@@ -82,7 +82,7 @@ defmodule Absinthe.Permission do
                 conds
               end)
 
-            val = PolicyCheck.reject(res.value, fs, args, user_context)
+            val = PolicyCheck.reject(res.value, fs, args, context)
             %{res | value: val}
         end
     end
