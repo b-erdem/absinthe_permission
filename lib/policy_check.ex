@@ -1,4 +1,8 @@
 defmodule Absinthe.Permission.PolicyCheck do
+  @moduledoc """
+
+  """
+
   alias Absinthe.Permission.DefaultFetcher
 
   @type condition :: Keyword.t()
@@ -74,11 +78,12 @@ defmodule Absinthe.Permission.PolicyCheck do
 
   @spec allowed?(Keyword.t(), list(), map(), list(atom | binary)) :: list()
   defp allowed?(args, conds, user_context, perms)
-  defp allowed?([], _, _user_context, perms) do
-    perms
-  end
 
-  defp allowed?([{_input_key, _input_val} | _tail] = args, conditions, user_context, perms) do
+  # defp allowed?([], _, _user_context, perms) do
+  #   perms
+  # end
+
+  defp allowed?(args, conditions, user_context, perms) do
     check_conds(conditions, args, user_context, perms)
   end
 
@@ -91,7 +96,7 @@ defmodule Absinthe.Permission.PolicyCheck do
 
   defp check_conds(
          [condition | conds],
-         [{_input_key, _input_val} | _tail] = args,
+         args,
          user_context,
          perms
        ) do
@@ -122,7 +127,8 @@ defmodule Absinthe.Permission.PolicyCheck do
     check_clause(condition, condition, args, user_context, {true, 0})
   end
 
-  @spec check_clause(list(clause), condition(), Keyword.t(), map(), {boolean(), integer()}) :: {boolean(), integer()}
+  @spec check_clause(list(clause), condition(), Keyword.t(), map(), {boolean(), integer()}) ::
+          {boolean(), integer()}
   defp check_clause(_, _, _, _, {false, counter}), do: {false, counter}
 
   defp check_clause([], _condition, _args, _user_context, state), do: state
@@ -134,13 +140,21 @@ defmodule Absinthe.Permission.PolicyCheck do
     input_val = Keyword.get(args, input_key)
     {preload, context____} = Keyword.pop(context___, :preload)
 
-    {:ok, result} =
-      DefaultFetcher.fetch(
-        model: model,
-        preload: preload,
-        clause: {remote_key, input_val},
-        extras: user_context.tenant
+    fetcher =
+      Application.get_env(
+        :absinthe_permission,
+        :fetcher,
+        Absinthe.Permission.DefaultFetcher.fetch() / 4
       )
+
+    {:ok, result} =
+      case fetcher do
+        fun when is_function(fetcher) ->
+          fun.(context, condition, args, user_context)
+
+        {module, fun} ->
+          :erlang.apply(module, fun, [context, condition, args, user_context])
+      end
 
     res = checker(result, context____, args, user_context)
 

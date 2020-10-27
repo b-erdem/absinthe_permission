@@ -1,4 +1,8 @@
 defmodule Absinthe.Permission do
+  @moduledoc """
+
+  """
+
   @behaviour Absinthe.Middleware
 
   alias Absinthe.Permission.PolicyCheck

@@ -1,5 +1,5 @@
 defmodule Absinthe.Permission.DefaultFetcher do
-  def fetch(model: _model, preload: _preload, clause: _clause, extras: _extras) do
+  def fetch(_context, _condition, _args, _user_context) do
     {:ok, nil}
   end
 end
