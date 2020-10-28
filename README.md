@@ -228,10 +228,38 @@ config :absinthe_permission, :fetchers,
 
 Fetchers in config can be a `{module, fun}` or just `&fun/5`.
 `PolicyChecker` sends fetchers 5 parameters:
-`%{key: key, value: val}, policy, input_parameters, absinthe_context, extras`
+`%{key: key, value: val}, policy, input_parameters, absinthe_context, extras`.
+Fetcher should return `{:ok, object}`.
 If you need some specific key or values for your fetcher you can put inside of 
-`extras` key. Fetchers should return `{:ok, object}`.
+`extras` key. 
 You can have more than fetchers for different operations.
 
 `fields`: Fields and their values that needs to compared against remote object after we fetch it.
+For example, if remote object has `state` field on it, and you can put this key and value you want to under `fields` key.
 
+```elixir
+mutation do
+  field :delete_todo, :todo do
+    meta(
+      pre_op_policies: [
+        [ 
+          remote_context: [
+            config: [fetcher_key: :todo_db, remote_key: input_key: :id],
+            fields: [creator__id: {:current_user_id, :neq}],
+            extras: [model: :todo],
+            required_permission: "can_delete_other_users_todo"
+            ]
+        ],
+        [ 
+          required_permission: "can_delete_any_todo"
+        ]
+      ]
+    )
+        
+    arg(:id, :integer)
+    ...
+  end
+end
+```
+
+Please check test for more examples.

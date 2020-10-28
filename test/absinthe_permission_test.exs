@@ -188,7 +188,7 @@ defmodule AbsinthePermissionTest do
           pre_op_policies: [
             [
               remote_context: [
-                config: [fetcher_key: :todo_db, remote_key: :id],
+                config: [fetcher_key: :todo_db, remote_key: :id, input_key: :id],
                 fields: [creator__id: {:current_user_id, :neq}],
                 extras: [model: :todo],
                 required_permission: "can_delete_other_users_todo"
