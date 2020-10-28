@@ -1,11 +1,9 @@
 # AbsinthePermission
 
-**Fine-grained Permission/Policy Check Middleware for Absinthe Queries/Mutations/Subscriptions**
+**Fine-grained Permission/Policy Checker Middleware for Absinthe Queries/Mutations/Subscriptions**
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `absinthe_permission` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
@@ -14,8 +12,3 @@ def deps do
   ]
 end
 ```
-
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/absinthe_permission](https://hexdocs.pm/absinthe_permission).
-

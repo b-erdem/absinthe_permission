@@ -1,6 +1,7 @@
 defmodule Absinthe.Permission.PolicyChecker do
   @moduledoc """
-
+  This module provides pre and post operation
+  policy checks functionality.
   """
 
   @type args :: Keyword.t()
@@ -9,6 +10,11 @@ defmodule Absinthe.Permission.PolicyChecker do
   @type clause :: Keyword.t()
   @type remote_context :: Keyword.t()
 
+  @doc """
+  Check given permission is in permission list.
+  If given permission is `nil` or empty string
+  it'll evaluate as true.
+  """
   @spec has_permission?(atom | binary, list(atom) | list(binary)) :: boolean
   def has_permission?(required_perm, user_perms)
 
@@ -23,6 +29,12 @@ defmodule Absinthe.Permission.PolicyChecker do
     perm in user_perms
   end
 
+  @doc """
+  Checks given policies against input arguments and absinthe context.
+  If there is match to any policies, it'll return highest ranked policy's permission.
+  If there is no match to any policy, then there's no need to any permission.
+  So it'll return permission granted.
+  """
   @spec should_we_allow?(args(), list(condition()), map()) :: boolean()
   def should_we_allow?(args, conds, context) do
     perms = allowed?(args, conds, context, [])
@@ -38,6 +50,9 @@ defmodule Absinthe.Permission.PolicyChecker do
     end
   end
 
+  @doc """
+  Filters given data based on filters specified for a policy.
+  """
   @spec reject(list | map, list(atom | binary), args(), map()) :: map()
   def reject(val, filters, args, context) do
     reject(val, fn x -> checker(x, filters, args, context) end)
@@ -53,6 +68,12 @@ defmodule Absinthe.Permission.PolicyChecker do
     Enum.reject([val], fun) |> List.first()
   end
 
+  @doc """
+  Returns highest ranker permission.
+  If policy checker more than one permission based on some policies,
+  then we need to check which policy matches more to the current
+  world state. Then we'll return the one which matches more.
+  """
   @spec higher_permission(Keyword.t(permission(), integer())) :: permission()
   defp higher_permission(permissions) do
     # TODO: if all conditions have same priority,
@@ -85,6 +106,9 @@ defmodule Absinthe.Permission.PolicyChecker do
     check_conds(conditions, args, context, perms)
   end
 
+  @doc """
+  Checks given conditions against input arguments and absinthe context.
+  """
   @spec check_conds(list(condition), Keyword.t(), map(), list()) :: list()
   defp check_conds(conditions, args, context, perms)
 
@@ -139,13 +163,6 @@ defmodule Absinthe.Permission.PolicyChecker do
          context,
          state
        ) do
-    # fetcher =
-    #   Application.get_env(
-    #     :absinthe_permission,
-    #     :fetcher,
-    #     &DefaultFetcher.fetch/4
-    #   )
-
     {config, remote_context} = Keyword.pop(remote_context, :config)
     {fields, remote_context} = Keyword.pop(remote_context, :fields)
     {extras, _remote_context} = Keyword.pop(remote_context, :extras)
