@@ -178,11 +178,15 @@ matches to given value in the policy("CLOSED").
 Policies accept more than one check. So you can put additional checks inside of it.
 
 Additionally, you can provide `remote_context` to pre-op policies.
+
 `remote_context`: Requires `config`, `extras` and `fields` definitions.
+
 `config`: Requires `fetcher_key`, `remote_key`, `input_key`.
+
 `PolicyChecker` needs these config values, because if you define a `remote_context`,
 it doesn't know where to get the object. So you need to put the fetcher you want to use
 in your application environment under `absinthe_permission, :fetchers` key.
+
 Example:
 
 ```elixir
@@ -199,8 +203,8 @@ Fetchers in config can be a `{module, fun}` or just `&fun/5`.
 `%{key: key, value: val}, policy, input_parameters, absinthe_context, extras`
 If you need some specific key or values for your fetcher you can put inside of 
 `extras` key. Fetchers should return `{:ok, object}`.
-
 You can have more than fetchers for different operations.
+
 `fields`: Fields and their values that needs to compared against remote object after we fetch it.
 
 
