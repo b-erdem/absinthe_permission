@@ -1,4 +1,4 @@
-defmodule Absinthe.Middleware.Permission do
+defmodule AbsinthePermission.Middleware.HasPermission do
   @moduledoc """
   This middleware allows to restrict operations on
   queries, mutations and subscriptions in declarative manner
@@ -119,7 +119,7 @@ defmodule Absinthe.Middleware.Permission do
 
   @behaviour Absinthe.Middleware
 
-  alias Absinthe.Permission.PolicyChecker
+  alias AbsinthePermission.PolicyChecker
 
   # check permission
   def call(

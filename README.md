@@ -12,3 +12,16 @@ def deps do
   ]
 end
 ```
+
+## Usage
+
+### Register the Middleware
+
+Add `AbsinthePermission.Middleware.HasPermission` to your Absinthe Schema:
+
+```elixir
+def middleware(middleware, _field, _object) do
+      [AbsinthePermission.Middleware.HasPermission] ++ middleware ++ [AbsinthePermission.Middleware.HasPermission]
+    end
+```
+

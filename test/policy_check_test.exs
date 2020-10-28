@@ -1,7 +1,7 @@
 defmodule PolicyCheckTest do
   use ExUnit.Case
 
-  alias Absinthe.Permission.PolicyChecker
+  alias AbsinthePermission.PolicyChecker
 
   test "has permission" do
     assert true == PolicyChecker.has_permission?("", ["perm1", "perm2", "perm3"])

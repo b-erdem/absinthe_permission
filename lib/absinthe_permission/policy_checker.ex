@@ -1,4 +1,4 @@
-defmodule Absinthe.Permission.PolicyChecker do
+defmodule AbsinthePermission.PolicyChecker do
   @moduledoc """
   This module provides pre and post operation
   policy checks functionality.

@@ -1,6 +1,6 @@
 defmodule AbsinthePermissionTest do
   use ExUnit.Case
-  doctest Absinthe.Middleware.Permission
+  doctest AbsinthePermission
 
   defmodule TodoDb do
     @behaviour GenServer
@@ -209,7 +209,7 @@ defmodule AbsinthePermissionTest do
     end
 
     def middleware(middleware, _field, _object) do
-      [Absinthe.Middleware.Permission] ++ middleware ++ [Absinthe.Middleware.Permission]
+      [AbsinthePermission.Middleware.HasPermission] ++ middleware ++ [AbsinthePermission.Middleware.HasPermission]
     end
   end
 
