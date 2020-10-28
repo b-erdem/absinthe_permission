@@ -157,6 +157,9 @@ def middleware(middleware, _field, _object) do
     end
 ```
 
+This middleware expects `current_user` and `permissions` in top level of Absinthe context.
+`permissions` list should be list of permission names: ["perm1", "perm2", ...]
+
 ### Defining Policies
 
 #### Simple Permission Check Definition.
