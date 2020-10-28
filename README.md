@@ -106,6 +106,8 @@ You can combine them in a policy. Local context and remote context together.
 
 For `remote_context` there are a few additional fields. Explanation is below.
 
+## 2: Post-op Permission/Policy Check.
+
 And there are some cases which you'd want to have policies after operation runs.
 For instance nullifying some fields in the response.
 Example: Everyone can get a ticket's details. And there's `assignee` field on it.
@@ -129,9 +131,35 @@ end
 ...
 ```
 
-## Defining Policies
 
-### Simple Permission Check Definition.
+
+
+## Installation
+
+
+```elixir
+def deps do
+  [
+    {:absinthe_permission, "~> 0.1.0"}
+  ]
+end
+```
+
+## Usage
+
+### Register the Middleware
+
+Add `AbsinthePermission.Middleware.HasPermission` to your Absinthe Schema:
+
+```elixir
+def middleware(middleware, _field, _object) do
+      [AbsinthePermission.Middleware.HasPermission] ++ middleware ++ [AbsinthePermission.Middleware.HasPermission]
+    end
+```
+
+### Defining Policies
+
+#### Simple Permission Check Definition.
 Only required parameter is `required_permission`.
 
 ```elixir
@@ -143,7 +171,7 @@ query do
 end
 ```
 
-2. Pre-op Policy Definition
+#### Pre-op Policy Definition
 
 Key name for defining pre-op policies is `pre_op_policies`.
 More than one policy definition can be provided.
@@ -206,29 +234,4 @@ If you need some specific key or values for your fetcher you can put inside of
 You can have more than fetchers for different operations.
 
 `fields`: Fields and their values that needs to compared against remote object after we fetch it.
-
-
-
-## Installation
-
-
-```elixir
-def deps do
-  [
-    {:absinthe_permission, "~> 0.1.0"}
-  ]
-end
-```
-
-## Usage
-
-### Register the Middleware
-
-Add `AbsinthePermission.Middleware.HasPermission` to your Absinthe Schema:
-
-```elixir
-def middleware(middleware, _field, _object) do
-      [AbsinthePermission.Middleware.HasPermission] ++ middleware ++ [AbsinthePermission.Middleware.HasPermission]
-    end
-```
 
