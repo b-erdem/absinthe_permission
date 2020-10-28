@@ -42,7 +42,7 @@ defmodule AbsinthePermission.MixProject do
       maintainers: ["Baris Erdem"],
       licenses: ["MIT"],
       links: %{github: "https://github.com/b-erdem/absinthe_permission"},
-      files: ~w(lib LICENSE.md mix.exs README.md)
+      files: ~w(lib LICENSE mix.exs README.md)
     ]
   end
 end
