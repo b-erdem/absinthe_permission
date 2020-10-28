@@ -1,5 +1,5 @@
 defmodule AbsinthePermission do
-   @moduledoc """
+  @moduledoc """
   This middleware allows to restrict operations on
   queries, mutations and subscriptions in declarative manner
   by leveraging `meta` field.

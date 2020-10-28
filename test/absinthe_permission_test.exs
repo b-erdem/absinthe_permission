@@ -209,7 +209,8 @@ defmodule AbsinthePermissionTest do
     end
 
     def middleware(middleware, _field, _object) do
-      [AbsinthePermission.Middleware.HasPermission] ++ middleware ++ [AbsinthePermission.Middleware.HasPermission]
+      [AbsinthePermission.Middleware.HasPermission] ++
+        middleware ++ [AbsinthePermission.Middleware.HasPermission]
     end
   end
 
