@@ -129,6 +129,82 @@ end
 ...
 ```
 
+## Defining Policies
+
+### Simple Permission Check Definition.
+Only required parameter is `required_permission`.
+
+```elixir
+query do
+  field(:get_todo_list, list_of(:todo)) do
+    meta(required_permission: "some_permission_name")
+    ...
+  end
+end
+```
+
+2. Pre-op Policy Definition
+
+Key name for defining pre-op policies is `pre_op_policies`.
+More than one policy definition can be provided.
+
+A policy is a keyword list. Any key inside of it will correspond to input names(except `remote_context` and `user_context`).
+Example:
+
+```
+mutation do
+  field(:update_ticket, :ticket) do
+    arg(:id, :integer)
+    arg(:state, :string)
+
+    meta(
+      pre_op_policies: [
+        [
+          state: "CLOSED",
+          required_permission: "can_close_ticket"
+        ],
+        [
+          state: "DONE",
+          required_permission: "can_move_ticket_to_done"
+        ]
+      ]
+    )
+  end
+end
+```
+
+In this example, `PolicyChecker` will check if `state` key in input values
+matches to given value in the policy("CLOSED").
+Policies accept more than one check. So you can put additional checks inside of it.
+
+Additionally, you can provide `remote_context` to pre-op policies.
+`remote_context`: Requires `config`, `extras` and `fields` definitions.
+`config`: Requires `fetcher_key`, `remote_key`, `input_key`.
+`PolicyChecker` needs these config values, because if you define a `remote_context`,
+it doesn't know where to get the object. So you need to put the fetcher you want to use
+in your application environment under `absinthe_permission, :fetchers` key.
+Example:
+
+```elixir
+...
+config :absinthe_permission, :fetchers,
+  todo_db: {MyFetcher, :fetch},
+  api1: {HttpFetcher, :fetch},
+  api2: &Api2Fetcher.fetch/5
+...
+```
+
+Fetchers in config can be a `{module, fun}` or just `&fun/5`.
+`PolicyChecker` sends fetchers 5 parameters:
+`%{key: key, value: val}, policy, input_parameters, absinthe_context, extras`
+If you need some specific key or values for your fetcher you can put inside of 
+`extras` key. Fetchers should return `{:ok, object}`.
+
+You can have more than fetchers for different operations.
+`fields`: Fields and their values that needs to compared against remote object after we fetch it.
+
+
+
 ## Installation
 
 
