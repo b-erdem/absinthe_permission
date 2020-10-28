@@ -3,8 +3,6 @@ defmodule Absinthe.Permission.PolicyChecker do
 
   """
 
-  alias Absinthe.Permission.DefaultFetcher
-
   @type args :: Keyword.t()
   @type permission :: atom | binary
   @type condition :: Keyword.t()
@@ -163,16 +161,20 @@ defmodule Absinthe.Permission.PolicyChecker do
 
     {:ok, result} =
       case fetcher do
-        fun when is_function(fetcher) ->
-          fun.([key: remote_key, value: input_val, extras: extras], condition, args, context)
+        fun when is_function(fetcher, 5) ->
+          fun.(%{key: remote_key, value: input_val}, condition, args, context, extras)
 
         {module, fun} ->
           :erlang.apply(module, fun, [
-            %{key: remote_key, value: input_val, extras: extras},
+            %{key: remote_key, value: input_val},
             condition,
             args,
-            context
+            context,
+            extras
           ])
+
+        _ ->
+          {:ok, nil}
       end
 
     res = checker(result, fields, args, context)

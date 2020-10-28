@@ -13,8 +13,8 @@ defmodule AbsinthePermissionTest do
       {:ok, []}
     end
 
-    def fetch(remote_context, _, _, _) do
-      res = GenServer.call(:todo_db, {:fetch, remote_context.key, remote_context.value})
+    def fetch(%{key: key, value: val}, _condition, _args, _context, _extras) do
+      res = GenServer.call(:todo_db, {:fetch, key, val})
       {:ok, res}
     end
 
@@ -57,6 +57,16 @@ defmodule AbsinthePermissionTest do
 
     def handle_call({:delete, id}, _from, state) do
       {:reply, Enum.find(state, &(&1.id == id)), Enum.reject(state, &(&1.id == id))}
+    end
+  end
+
+  defmodule EctoFetcher do
+    @spec fetch(map(), Keyword.t(), Keyword.t(), Keyword.t(), map()) :: {:ok, any}
+    def fetch(clause, _condition, _args, _context, extras) do
+      repo = Keyword.get(extras, :repo)
+      model = Keyword.get(extras, :model)
+
+      {:ok, repo.get_by(model, {clause.key, clause.val})}
     end
   end
 
