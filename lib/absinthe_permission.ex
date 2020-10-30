@@ -50,7 +50,7 @@ defmodule AbsinthePermission do
      ```
 
      You can define this policy in other way around as well.
-     Imstead of having a permission like "can_change_his_own_todo",
+     Instead of having a permission like "can_change_his_own_todo",
      you can have permission like "can_change_other_users_todos".
      In this case the policy would be like this:
 
