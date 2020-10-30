@@ -8,7 +8,7 @@ by leveraging Absinthe's `meta` field.
 This module defines 3 types policies:
 
 1. Simple permission checks. It only checks if a user has specified permission or not.
-2. Policy checks prior to run query, nutation or subscription.
+2. Policy checks prior to run query, mutation or subscription.
 3. Policy checks after operation.
 
 ## 1: Simple Permission Checks

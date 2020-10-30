@@ -1,24 +1,28 @@
 defmodule AbsinthePermission.MixProject do
   use Mix.Project
 
+  @source_url "https://github.com/b-erdem/absinthe_permission"
+  @version "0.1.0"
+
   def project do
     [
       app: :absinthe_permission,
       name: "AbsinthePermission",
       package: package(),
       description: description(),
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.10",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       docs: [
         main: "AbsinthePermission",
-        extras: ["README.md"]
+        extras: ["README.md"],
+        source_ref: "v#{@version}",
+        source_url: @source_url
       ]
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
   def application do
     [
       extra_applications: [:logger]
@@ -29,7 +33,6 @@ defmodule AbsinthePermission.MixProject do
     "Fine-grained Permission/Policy Checker Middleware for Absinthe GraphQL"
   end
 
-  # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
       {:absinthe, "~> 1.4"},
@@ -41,7 +44,7 @@ defmodule AbsinthePermission.MixProject do
     [
       maintainers: ["Baris Erdem"],
       licenses: ["MIT"],
-      links: %{github: "https://github.com/b-erdem/absinthe_permission"},
+      links: %{GitHub: @source_url},
       files: ~w(lib LICENSE mix.exs README.md)
     ]
   end
