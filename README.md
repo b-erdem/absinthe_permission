@@ -1,268 +1,233 @@
 # AbsinthePermission
 
-**Fine-grained Permission/Policy Checker Middleware for Absinthe Queries/Mutations/Subscriptions**
+[![Hex.pm](https://img.shields.io/hexpm/v/absinthe_permission.svg)](https://hex.pm/packages/absinthe_permission)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-This module allows to define fine-grained permissions for queries, mutations and subscriptions
-by leveraging Absinthe's `meta` field.
+**Declarative, schema-first authorization for Absinthe GraphQL.**
 
-This module defines 3 types policies:
-
-1. Simple permission checks. It only checks if a user has specified permission or not.
-2. Policy checks prior to run query, mutation or subscription.
-3. Policy checks after operation.
-
-## 1: Simple Permission Checks
-
-For type 1 policies definition is simple. You just provide permission name on query and that's it.
-It'll run before executing the operation.
-
-Example:
+Auth rules live next to the field they protect. They compile to
+introspectable data, evaluate via middleware, and emit telemetry on
+every decision.
 
 ```elixir
-...
-query do
-  ...
-  field(:get_todo_list, list_of(:todo)) do
-    meta(required_permission: "can_view_todo_list")
-  end
-  ...
-end
-...
-```
+field :update_todo, :todo do
+  arg :id, :integer
+  arg :state, :string
 
-## 2: Pre-op Permission/Policy Check.
+  authorize "edit_todos"
+  authorize "close_todos", when: arg(:state) == "CLOSED"
 
-There are a few common ways to check if a user is allowed to do the operation before running the operation.
-One of them is checking given input values to see if the user is allowed to do operation.
-For instance you have an app like Jira. And a user wants to change the status of a ticket.
-And let's say only project managers can change a ticket status as `CLOSED`.
-In this case when a request comes in with `{..., state: "CLOSED"}`, then you'd want to check
-`state` parameter if it's `CLOSED` or not. Then check if the user has this permission: `can_close_ticket`.
+  authorize_owner :todo,
+    by: arg(:id),
+    if_owner: "edit_own_todo",
+    if_other: "edit_others_todo"
 
-With this module you can define this policy without writing any code:
-
-```elixir
-mutation do
-  ...
-  field(:update_ticket, :ticket) do
-    arg(:id, :integer)
-    arg(:detail, :string)
-    arg(:state, :string)
-    
-    meta(
-      pre_op_policies: [
-        [
-          state: "CLOSED",
-          required_permission: "can_close_ticket"
-        ]
-      ]
-    )
-  end
-  ...
+  resolve &MyApp.Resolvers.update_todo/2
 end
 ```
 
+That's it. No separate policy module to wire up; no string-encoded
+field paths; no closures hidden in module attributes; no surprise
+fail-open behaviour. Conditions are real Elixir, validated at
+`mix compile`, inspectable at runtime via
+`AbsinthePermission.rules_for/3` or `mix absinthe_permission.audit`.
 
-In some other cases, it's not enough to check input values to allow or deny a user.
-For some operations you'd want to check the remote object before doing any operation on it.
-Let's say, there's another permission for updating description of a "CLOSED" ticket.
-In this case before allowing a user to change the description of a ticket, you first fetch it
-from remote and check it if its `state` is "CLOSED" or not. And you allow or deny.
+## When to use this
 
-Here is how to add a new policy to `updateTicket` mutation:
+- You write Absinthe schemas and want per-field authorization rules
+  that read like English.
+- You want to enforce policies *visible on the schema* — humans and
+  AI agents can read `field :update_todo do ... end` and immediately
+  see what's protected.
+- You're tired of fighting Absinthe's `meta/1` keyword-list-of-
+  keyword-list DSLs.
 
-```elixir
-mutation do
-  ...
-  field(:update_ticket, :ticket) do
-    arg(:id, :integer)
-    arg(:detail, :string)
-    arg(:state, :string)
-          
-    meta(   
-      pre_op_policies: [
-        [
-          state: "CLOSED",
-          required_permission: "can_close_ticket"
-        ],
-        [
-          remote_context: [
-            config: [fetcher_key: :my_db, remote_key: :id, input_key: :id],
-            fields: [state: "CLOSED"],
-            extras: [model: Ticket]
-          ],
-          required_permission: "can_update_closed_ticket_detail"
-        ]
-      ]
-    )
-  end
-  ...
-end
-```
-
-These are a few examples what can be done with pre operation policies.
-And even more, you're not limited to use only one of them for a policy.
-You can combine them in a policy. Local context and remote context together.
-
-For `remote_context` there are a few additional fields. Explanation is below.
-
-## 2: Post-op Permission/Policy Check.
-
-And there are some cases which you'd want to have policies after operation runs.
-For instance nullifying some fields in the response.
-Example: Everyone can get a ticket's details. And there's `assignee` field on it.
-`assignee` field has `email` field. And you don't want to everyone see this field.
-You can define this policy on `email` field:
-
-```elixir
-...
-object :assignee do
-  field(:id, :integer)
-  field(:name, :string)
-  ...
-  field(:email, :string) do
-    meta(
-      post_op_policies: [
-        [required_permission: "can_view_email"]
-      ]
-    )
-  end
-end
-...
-```
-
-
-
+If you instead prefer policy modules per resource (Bodyguard / Permit
+style), look at [`permit_absinthe`](https://hex.pm/packages/permit_absinthe).
+This library deliberately occupies the *declarative-on-schema* niche.
 
 ## Installation
-
 
 ```elixir
 def deps do
   [
-    {:absinthe_permission, "~> 0.1.0"}
+    {:absinthe_permission, "~> 1.0"}
   ]
 end
 ```
 
-## Usage
+Requires Elixir `~> 1.14` and Absinthe `~> 1.7`.
 
-### Register the Middleware
+## Five-minute walkthrough
 
-Add `AbsinthePermission.Middleware.HasPermission` to your Absinthe Schema:
+### 1. Wire up the schema
 
 ```elixir
-def middleware(middleware, _field, _object) do
-      [AbsinthePermission.Middleware.HasPermission] ++ middleware ++ [AbsinthePermission.Middleware.HasPermission]
+defmodule MyApp.Schema do
+  use Absinthe.Schema
+  use AbsinthePermission
+
+  loaders do
+    loader :todo, fn id, _ctx -> MyApp.Todos.get(id) end
+  end
+
+  query do
+    field :todos, list_of(:todo) do
+      authorize "view_todos"
+      resolve &MyApp.Resolvers.list_todos/2
     end
-```
+  end
 
-This middleware expects `current_user` and `permissions` in top level of Absinthe context.
-`permissions` list should be list of permission names: ["perm1", "perm2", ...]
+  mutation do
+    field :update_todo, :todo do
+      arg :id, :integer
+      arg :state, :string
 
-### Defining Policies
+      authorize "edit_todos"
+      authorize "close_todos", when: arg(:state) == "CLOSED"
 
-#### Simple Permission Check Definition.
-Only required parameter is `required_permission`.
-
-```elixir
-query do
-  field(:get_todo_list, list_of(:todo)) do
-    meta(required_permission: "some_permission_name")
-    ...
+      resolve &MyApp.Resolvers.update_todo/2
+    end
   end
 end
 ```
 
-#### Pre-op Policy Definition
+### 2. Populate the context
 
-Key name for defining pre-op policies is `pre_op_policies`.
-More than one policy definition can be provided.
+In your Plug pipeline (typically `MyAppWeb.Context`):
 
-A policy is a keyword list. Any key inside of it will correspond to input names(except `remote_context` and `user_context`).
-Example:
-
+```elixir
+conn
+|> Absinthe.Plug.put_options(
+  context: %{
+    current_user: user,
+    permissions: MyApp.Auth.permissions_for(user)
+  }
+)
 ```
-mutation do
-  field(:update_ticket, :ticket) do
-    arg(:id, :integer)
-    arg(:state, :string)
 
-    meta(
-      pre_op_policies: [
-        [
-          state: "CLOSED",
-          required_permission: "can_close_ticket"
-        ],
-        [
-          state: "DONE",
-          required_permission: "can_move_ticket_to_done"
-        ]
-      ]
-    )
-  end
+`permissions` is a list of binary permission strings. That's it.
+
+### 3. (Optional) attach telemetry
+
+```elixir
+:telemetry.attach(
+  "ap-deny-logger",
+  [:absinthe_permission, :decision, :deny],
+  &MyApp.AuthLogger.handle/4,
+  []
+)
+```
+
+## DSL reference
+
+### `authorize/2`
+
+```elixir
+authorize "edit_todos"                              # always required
+authorize ["admin", "support"]                       # any-of
+authorize all: ["admin", "verified_2fa"]             # all-of
+
+authorize "close_todos",  when: arg(:state) == "CLOSED"
+authorize "high_prio",    when: arg(:priority) > 5
+authorize "edit_own",     when: loaded(:todo).owner_id == current_user.id
+authorize "edit_others",  unless: loaded(:todo).owner_id == current_user.id
+authorize "view_emails",  on_deny: :null            # redact, return null
+authorize "edit_todos",   error_message: "Only admins may edit todos."
+
+# Escape hatch
+authorize "complex", when: &MyApp.Auth.complex_check/1
+```
+
+#### Condition helpers (used inside `when:` / `unless:`)
+
+| | |
+| --- | --- |
+| `arg(:name)` | a GraphQL argument |
+| `loaded(:name).field.path` | a field on a loaded record |
+| `current_user.id` (or `current_user(:id)`) | shorthand for `context.current_user.id` |
+| `context.path` | arbitrary context lookup |
+
+All native Elixir comparison operators work: `==`, `!=`, `>`, `>=`,
+`<`, `<=`, `in`. Combine with `and` / `or` / `not`.
+
+### `load/2`
+
+Resolves a record once before any rule on the field runs.
+
+```elixir
+load :todo, by: arg(:id)
+load :user, by: arg(:user_id), using: :user_loader
+```
+
+Loaders are registered with `loader/2`:
+
+```elixir
+loaders do
+  loader :todo, fn id, _ctx -> MyApp.Todos.get(id) end
+  loader :user, &MyApp.Users.fetch/2
 end
 ```
 
-In this example, `PolicyChecker` will check if `state` key in input values
-matches to given value in the policy("CLOSED").
-Policies accept more than one check. So you can put additional checks inside of it.
+### `authorize_owner/2`
 
-Additionally, you can provide `remote_context` to pre-op policies.
-
-`remote_context`: Requires `config`, `extras` and `fields` definitions.
-
-`config`: Requires `fetcher_key`, `remote_key`, `input_key`.
-
-`PolicyChecker` needs these config values, because if you define a `remote_context`,
-it doesn't know where to get the object. So you need to put the fetcher you want to use
-in your application environment under `absinthe_permission, :fetchers` key.
-
-Example:
+Sugar for the most common pattern:
 
 ```elixir
-...
-config :absinthe_permission, :fetchers,
-  todo_db: {MyFetcher, :fetch},
-  api1: {HttpFetcher, :fetch},
-  api2: &Api2Fetcher.fetch/5
-...
+authorize_owner :todo,
+  by:          arg(:id),
+  owner_field: :owner_id,           # default
+  user_field:  :id,                  # default
+  if_owner:    "edit_own_todo",
+  if_other:    "edit_others_todo"
 ```
 
-Fetchers in config can be a `{module, fun}` or just `&fun/5`.
-`PolicyChecker` sends fetchers 5 parameters:
-`%{key: key, value: val}, policy, input_parameters, absinthe_context, extras`.
-Fetcher should return `{:ok, object}`.
-If you need some specific key or values for your fetcher you can put inside of 
-`extras` key. 
-You can have more than fetchers for different operations.
+Expands to one `load` plus two `authorize` rules.
 
-`fields`: Fields and their values that needs to compared against remote object after we fetch it.
-For example, if remote object has `state` field on it, and you can put this key and value you want to under `fields` key.
+## Introspection
 
 ```elixir
-mutation do
-  field :delete_todo, :todo do
-    meta(
-      pre_op_policies: [
-        [ 
-          remote_context: [
-            config: [fetcher_key: :todo_db, remote_key: input_key: :id],
-            fields: [creator__id: {:current_user_id, :neq}],
-            extras: [model: :todo],
-            required_permission: "can_delete_other_users_todo"
-            ]
-        ],
-        [ 
-          required_permission: "can_delete_any_todo"
-        ]
-      ]
-    )
-        
-    arg(:id, :integer)
-    ...
-  end
-end
+AbsinthePermission.rules_for(MyApp.Schema, :mutation, :update_todo)
+AbsinthePermission.loads_for(MyApp.Schema, :mutation, :update_todo)
+AbsinthePermission.loader(MyApp.Schema, :todo)
+AbsinthePermission.all_rules(MyApp.Schema)
 ```
 
-Please check test for more examples.
+Or from the command line:
+
+```bash
+mix absinthe_permission.audit MyApp.Schema
+mix absinthe_permission.audit MyApp.Schema --filter todo
+mix absinthe_permission.audit MyApp.Schema --format json
+```
+
+## Telemetry events
+
+| Event | Metadata |
+| --- | --- |
+| `[:absinthe_permission, :decision, :allow]` | `%{schema, type, field, decision}` |
+| `[:absinthe_permission, :decision, :deny]`  | `%{schema, type, field, decision}` |
+| `[:absinthe_permission, :decision, :nullify]` | `%{schema, type, field, decision}` |
+| `[:absinthe_permission, :load, :stop]`      | `%{loader, name, found}` |
+| `[:absinthe_permission, :load, :exception]` | `%{loader, name, error}` |
+
+The `decision` field is a `t:AbsinthePermission.Decision.t/0` —
+useful for audit logs.
+
+## Configuration
+
+```elixir
+use AbsinthePermission, on_missing_context: :raise   # default
+use AbsinthePermission, on_missing_context: :deny    # return GraphQL error
+use AbsinthePermission, on_missing_context: :allow   # treat as anonymous
+```
+
+## For AI coding agents
+
+This repo ships an [`AGENTS.md`](AGENTS.md) cookbook with verified
+patterns and a one-screen mental model. If you're an LLM working on
+an Absinthe project, start there.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
